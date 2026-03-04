@@ -1,7 +1,6 @@
-import { Leaf, Sparkles } from "lucide-react";
+import { Leaf, Mic, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { MobileShell } from "@/components/layout/mobile-shell";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth/user";
 import { getDashboardWeeklyReport, getHomeData } from "@/lib/data/queries";
@@ -47,9 +46,12 @@ export default async function HomePage() {
           </div>
         </header>
 
-        <Button asChild className="min-h-16 w-full text-base">
-          <Link href="/record">今日話す</Link>
-        </Button>
+        <Link href="/record" className="mx-auto flex w-fit flex-col items-center gap-2">
+          <span className="pressable-soft pressable-soft-accent flex size-20 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--text-on-accent)] shadow-[8px_8px_18px_var(--shadow-dark),-8px_-8px_18px_var(--shadow-light)]">
+            <Mic className="size-8" />
+          </span>
+          <span className="text-base font-semibold text-[var(--accent-dark)]">今日話す</span>
+        </Link>
 
         <Card soft className="p-5">
           <div className="flex gap-3">
