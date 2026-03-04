@@ -93,22 +93,20 @@ export default async function EntriesPage({
           <p className="text-sm text-[var(--text-secondary)]">日付を選んで、その日の記録だけを見返せます。</p>
         </div>
 
-        <Card inset>
-          <form className="space-y-3" action="/entries">
-            <input type="hidden" name="month" value={activeMonth} />
-            <input type="hidden" name="date" value={activeDate} />
-            <label className="flex items-center gap-3 rounded-[20px] bg-[var(--bg-page)] px-4 py-4 shadow-[inset_4px_4px_10px_var(--shadow-dark),inset_-4px_-4px_10px_var(--shadow-light)]">
-              <Search className="size-4 text-[var(--text-tertiary)]" />
-              <input
-                type="search"
-                name="q"
-                defaultValue={params.q}
-                placeholder="タイトルや言葉で検索"
-                className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none"
-              />
-            </label>
-          </form>
-        </Card>
+        <form action="/entries">
+          <input type="hidden" name="month" value={activeMonth} />
+          <input type="hidden" name="date" value={activeDate} />
+          <label className="pressable-soft pressable-soft-neutral flex items-center gap-3 rounded-[20px] bg-[var(--bg-page)] px-4 py-4 shadow-[6px_6px_14px_var(--shadow-dark),-6px_-6px_14px_var(--shadow-light)]">
+            <Search className="size-4 text-[var(--text-tertiary)]" />
+            <input
+              type="search"
+              name="q"
+              defaultValue={params.q}
+              placeholder="タイトルや言葉で検索"
+              className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none"
+            />
+          </label>
+        </form>
 
         <Card>
           <div className="space-y-4">
@@ -116,7 +114,7 @@ export default async function EntriesPage({
               <Link
                 href={buildHref({ q: params.q, month: prevMonth })}
                 aria-label="前の月を見る"
-                className="flex size-11 items-center justify-center rounded-full bg-[var(--bg-page)] text-[var(--text-primary)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]"
+                className="pressable-soft pressable-soft-neutral flex size-11 items-center justify-center rounded-full bg-[var(--bg-page)] text-[var(--text-primary)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]"
               >
                 <ChevronLeft className="size-4" />
               </Link>
@@ -124,7 +122,7 @@ export default async function EntriesPage({
               <Link
                 href={buildHref({ q: params.q, month: nextMonth })}
                 aria-label="次の月を見る"
-                className="flex size-11 items-center justify-center rounded-full bg-[var(--bg-page)] text-[var(--text-primary)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]"
+                className="pressable-soft pressable-soft-neutral flex size-11 items-center justify-center rounded-full bg-[var(--bg-page)] text-[var(--text-primary)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]"
               >
                 <ChevronRight className="size-4" />
               </Link>
@@ -143,24 +141,26 @@ export default async function EntriesPage({
                 const day = index + 1;
                 const dateValue = `${activeMonth}-${String(day).padStart(2, "0")}`;
                 const selected = dateValue === activeDate;
-                const count = entryCountByDate.get(dateValue) ?? 0;
+                const hasEntries = (entryCountByDate.get(dateValue) ?? 0) > 0;
 
                 return (
                   <Link
                     key={dateValue}
                     href={buildHref({ q: params.q, month: activeMonth, date: dateValue })}
                     aria-label={`${day}日を表示`}
-                    className={`flex min-h-12 flex-col items-center justify-center rounded-[16px] text-sm ${
+                    className={`pressable-soft pressable-soft-neutral flex min-h-12 flex-col items-center justify-center rounded-[16px] text-sm ${
                       selected
-                        ? "bg-[var(--accent)] text-[var(--text-on-accent)]"
+                        ? "bg-[var(--bg-page)] text-[var(--accent-dark)] shadow-[inset_5px_5px_12px_var(--shadow-dark),inset_-5px_-5px_12px_var(--shadow-light)]"
                         : "bg-[var(--bg-page)] text-[var(--text-primary)] shadow-[4px_4px_10px_var(--shadow-dark),-4px_-4px_10px_var(--shadow-light)]"
                     }`}
                   >
                     <span className="font-semibold">{day}</span>
-                    <span
-                      className={`text-[10px] ${selected ? "opacity-80" : "text-[var(--accent-dark)]"}`}
-                    >
-                      {count > 0 ? `${count}件` : " "}
+                    <span className="flex min-h-3 items-center justify-center">
+                      {hasEntries ? (
+                        <span
+                          className={`size-1.5 rounded-full ${selected ? "bg-[var(--accent-dark)]" : "bg-[var(--accent)]"}`}
+                        />
+                      ) : null}
                     </span>
                   </Link>
                 );

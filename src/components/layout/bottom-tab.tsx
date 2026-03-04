@@ -37,10 +37,10 @@ export function BottomTab() {
               key={tab.href}
               href={tab.href}
               className={cn(
-                "flex min-w-14 flex-col items-center gap-1 rounded-[20px] px-3 py-2 text-[11px] font-medium",
+                "pressable-soft flex min-w-14 flex-col items-center gap-1 rounded-[20px] px-3 py-2 text-[11px] font-medium",
                 active
-                  ? "bg-[var(--accent)] text-[var(--text-on-accent)]"
-                  : "text-[var(--icon-inactive)]",
+                  ? "pressable-soft-accent bg-[var(--accent)] text-[var(--text-on-accent)]"
+                  : "pressable-soft-neutral text-[var(--icon-inactive)]",
               )}
             >
               <Icon className="size-4" />

@@ -80,3 +80,43 @@ input,
 button {
   font: inherit;
 }
+
+.pressable-soft {
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease,
+    background-color 140ms ease;
+  will-change: transform, box-shadow;
+}
+
+.pressable-soft:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+.pressable-soft-neutral:active {
+  box-shadow:
+    inset 5px 5px 12px var(--shadow-dark),
+    inset -5px -5px 12px var(--shadow-light);
+}
+
+.pressable-soft-accent:active {
+  box-shadow:
+    inset 5px 5px 12px rgba(38, 84, 56, 0.28),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.18);
+  filter: brightness(0.98);
+}
+
+.pressable-soft-warm:active {
+  box-shadow:
+    inset 5px 5px 12px rgba(111, 69, 48, 0.28),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.18);
+  filter: brightness(0.98);
+}
+
+.pressable-soft-danger:active {
+  box-shadow:
+    inset 5px 5px 12px rgba(114, 43, 43, 0.28),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.18);
+  filter: brightness(0.98);
+}

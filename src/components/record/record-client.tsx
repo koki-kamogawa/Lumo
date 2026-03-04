@@ -173,7 +173,7 @@ export function RecordClient() {
           type="button"
           onClick={discard}
           aria-label="録音を破棄する"
-          className="flex size-12 items-center justify-center rounded-full bg-[var(--bg-page)] text-[var(--accent-red)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]"
+          className="pressable-soft pressable-soft-neutral flex size-12 items-center justify-center rounded-full bg-[var(--bg-page)] text-[var(--accent-red)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]"
         >
           <Trash2 className="size-5" />
         </button>
@@ -181,7 +181,7 @@ export function RecordClient() {
           type="button"
           onClick={recording ? stopRecording : startRecording}
           aria-label={recording ? "録音を停止する" : "録音を開始する"}
-          className="flex size-[72px] items-center justify-center rounded-full bg-[var(--accent-coral)] text-[var(--text-on-accent)] shadow-[6px_6px_14px_var(--shadow-dark),-6px_-6px_14px_var(--shadow-light)]"
+          className="pressable-soft pressable-soft-warm flex size-[72px] items-center justify-center rounded-full bg-[var(--accent-coral)] text-[var(--text-on-accent)] shadow-[6px_6px_14px_var(--shadow-dark),-6px_-6px_14px_var(--shadow-light)]"
         >
           {recording ? <Square className="size-6 fill-current" /> : <Mic className="size-6" />}
         </button>

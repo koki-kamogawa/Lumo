@@ -17,7 +17,7 @@ export function MobileShell({
         {topAction !== undefined ? topAction : (
           <Link
             href="/settings"
-            className="rounded-full bg-[var(--bg-page)] p-3 text-[var(--text-secondary)] shadow-[6px_6px_14px_var(--shadow-dark),-6px_-6px_14px_var(--shadow-light)]"
+            className="pressable-soft pressable-soft-neutral rounded-full bg-[var(--bg-page)] p-3 text-[var(--text-secondary)] shadow-[6px_6px_14px_var(--shadow-dark),-6px_-6px_14px_var(--shadow-light)]"
           >
             <Settings className="size-5" />
           </Link>
