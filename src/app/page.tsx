@@ -29,18 +29,24 @@ export default async function HomePage() {
       };
 
   return (
-    <MobileShell>
+    <MobileShell
+      topLeft={<p className="text-neumorph text-2xl font-black tracking-[0.04em]">Limo</p>}
+    >
       <div className="space-y-5 pb-1 pt-1">
         <header className="space-y-4">
           <p className="text-sm font-medium text-[var(--text-tertiary)]">{formatDateJP(new Date())}</p>
-          <h1 className="max-w-[300px] text-[30px] font-bold leading-tight text-[var(--text-primary)]">
+
+          <h1 className="mx-auto max-w-[320px] text-center text-[30px] font-bold leading-tight text-[var(--text-primary)]">
             今日のことを、
             <br />
             ひとつだけ話そう。
           </h1>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--bg-page)] px-4 py-2 text-sm text-[var(--accent-dark)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]">
-            <Leaf className="size-4 text-[var(--accent)]" />
-            {home.streak}日つづけて記録中
+
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[var(--bg-page)] px-4 py-2 text-sm text-[var(--accent-dark)] shadow-[5px_5px_12px_var(--shadow-dark),-5px_-5px_12px_var(--shadow-light)]">
+              <Leaf className="size-4 text-[var(--accent)]" />
+              {home.streak}日つづけて記録中
+            </div>
           </div>
         </header>
 

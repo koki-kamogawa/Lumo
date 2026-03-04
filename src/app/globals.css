@@ -120,3 +120,10 @@ button {
     inset -5px -5px 12px rgba(255, 255, 255, 0.18);
   filter: brightness(0.98);
 }
+
+.text-neumorph {
+  color: var(--text-secondary);
+  text-shadow:
+    -1px -1px 0 color-mix(in srgb, var(--shadow-light) 65%, transparent),
+    1px 1px 0 color-mix(in srgb, var(--shadow-dark) 70%, transparent);
+}

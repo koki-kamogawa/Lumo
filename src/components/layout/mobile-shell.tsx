@@ -3,17 +3,19 @@ import Link from "next/link";
 
 export function MobileShell({
   children,
+  topLeft,
   topAction,
   withTabBar = true,
 }: {
   children: React.ReactNode;
+  topLeft?: React.ReactNode;
   topAction?: React.ReactNode;
   withTabBar?: boolean;
 }) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-[var(--bg-page)]">
       <div className="flex items-center justify-between px-6 pb-2 pt-5">
-        <div />
+        {topLeft ?? <div />}
         {topAction !== undefined ? topAction : (
           <Link
             href="/settings"
