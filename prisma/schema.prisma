@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ResponseStyle {
+  EMPATHETIC
+  BALANCED
+  CONCLUSION_FOCUSED
+}
+
+enum GoalMode {
+  MOOD
+  ORGANIZE
+  GOAL
+  SELF_UNDERSTANDING
+}
+
+enum AdviceIntensity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum MemoryMode {
+  AUTO
+  APPROVAL
+}
+
+enum MemoryStatus {
+  ACTIVE
+  ARCHIVED
+  REJECTED
+}
+
+enum SourceMode {
+  AUTO
+  APPROVAL
+}
+
+enum ProposalStatus {
+  PENDING
+  APPLIED
+  DISMISSED
+}
+
+model User {
+  id            String           @id @default(cuid())
+  email         String?          @unique
+  name          String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  settings      Settings?
+  entries       Entry[]
+  memoryItems   MemoryItem[]
+  proposals     MemoryProposal[]
+  weeklyReports WeeklyReport[]
+  shareCards    ShareCard[]
+
+  @@map("users")
+}
+
+model Settings {
+  id                String          @id @default(cuid())
+  userId            String          @unique
+  responseStyle     ResponseStyle   @default(BALANCED)
+  purpose           GoalMode        @default(SELF_UNDERSTANDING)
+  adviceIntensity   AdviceIntensity @default(MEDIUM)
+  memoryMode        MemoryMode      @default(AUTO)
+  shareByDefault    Boolean         @default(false)
+  reminderFrequency String?
+  reminderTime      String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+model Entry {
+  id                  String               @id @default(cuid())
+  userId              String
+  title               String
+  note                String?
+  occurredAt          DateTime             @default(now())
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audio               EntryAudio?
+  transcript          Transcript?
+  analysis            AnalysisResult?
+  memoryEvidenceLinks MemoryEvidenceLink[]
+  proposals           MemoryProposal[]
+  shareCards          ShareCard[]
+
+  @@index([userId, occurredAt])
+  @@map("entries")
+}
+
+model EntryAudio {
+  id          String   @id @default(cuid())
+  entryId     String   @unique
+  storageKey  String
+  filePath    String
+  mimeType    String
+  durationSec Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  entry       Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("entry_audio")
+}
+
+model Transcript {
+  id            String   @id @default(cuid())
+  entryId       String   @unique
+  content       String
+  editedContent String?
+  source        String
+  confidence    Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  entry         Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("transcripts")
+}
+
+model AnalysisResult {
+  id                  String   @id @default(cuid())
+  entryId             String   @unique
+  summaryFacts        String   @map("summary_facts")
+  emotionTopJson      String   @map("emotion_top_json")
+  energyPeakQuote     String   @map("energy_peak_quote")
+  followupQuestion    String   @map("followup_question")
+  weekHintLine        String   @map("week_hint_line")
+  praiseLine          String   @map("praise_line")
+  praiseEvidenceQuote String   @map("praise_evidence_quote")
+  microBadge          String?  @map("micro_badge")
+  nextTeaser          String   @map("next_teaser")
+  temporaryTone       String?  @map("temporary_tone")
+  crisisDetected      Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  entry               Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("analysis_results")
+}
+
+model MemoryItem {
+  id            String               @id @default(cuid())
+  userId        String
+  category      String?
+  memoryText    String               @map("memory_text")
+  confidence    Float
+  stability     Float
+  sensitivity   String
+  status        MemoryStatus         @default(ACTIVE)
+  sourceMode    SourceMode           @map("source_mode")
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  archivedAt    DateTime?
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evidenceLinks MemoryEvidenceLink[]
+
+  @@index([userId, status])
+  @@map("memory_items")
+}
+
+model MemoryEvidenceLink {
+  id           String     @id @default(cuid())
+  memoryItemId String     @map("memory_item_id")
+  entryId      String?    @map("entry_id")
+  quote        String
+  createdAt    DateTime   @default(now())
+  memoryItem   MemoryItem @relation(fields: [memoryItemId], references: [id], onDelete: Cascade)
+  entry        Entry?     @relation(fields: [entryId], references: [id], onDelete: SetNull)
+
+  @@map("memory_evidence_links")
+}
+
+model MemoryProposal {
+  id                String         @id @default(cuid())
+  userId            String
+  entryId           String
+  proposedItemsJson String         @map("proposed_items_json")
+  status            ProposalStatus @default(PENDING)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entry             Entry          @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("memory_proposals")
+}
+
+model WeeklyReport {
+  id               String      @id @default(cuid())
+  userId           String
+  weekStart        DateTime    @map("week_start")
+  weekEnd          DateTime    @map("week_end")
+  emotionFlowJson  String      @map("emotion_flow_json")
+  themeTagsJson    String      @map("theme_tags_json")
+  changeSummary    String      @map("change_summary")
+  loopSummary      String      @map("loop_summary")
+  recoveryListJson String      @map("recovery_list_json")
+  shareLine        String?     @map("share_line")
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shareCards       ShareCard[]
+
+  @@index([userId, weekStart])
+  @@map("weekly_reports")
+}
+
+model ShareCard {
+  id              String        @id @default(cuid())
+  userId          String
+  entryId         String?       @map("entry_id")
+  weeklyReportId  String?       @map("weekly_report_id")
+  maskedQuote     String        @map("masked_quote")
+  emotionTagsJson String        @map("emotion_tags_json")
+  createdAt       DateTime      @default(now())
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entry           Entry?        @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  weeklyReport    WeeklyReport? @relation(fields: [weeklyReportId], references: [id], onDelete: SetNull)
+
+  @@map("share_cards")
+}
