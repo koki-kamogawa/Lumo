@@ -2,11 +2,14 @@
 
 import { Lightbulb, Mic, Square, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useToast } from "@/components/providers/app-providers";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { fetchJson } from "@/lib/client";
+
+const BAR_COUNT = 20;
+const IDLE_BARS = new Array(BAR_COUNT).fill(10);
 
 function formatClock(seconds: number) {
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
@@ -17,13 +20,83 @@ function formatClock(seconds: number) {
 export function RecordClient() {
   const router = useRouter();
   const { push } = useToast();
+
   const [memo, setMemo] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [bars, setBars] = useState<number[]>(IDLE_BARS);
   const [pending, startTransition] = useTransition();
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const previousBarsRef = useRef<number[]>(IDLE_BARS);
+
+  const stopWaveform = () => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    sourceNodeRef.current?.disconnect();
+    analyserRef.current?.disconnect();
+    sourceNodeRef.current = null;
+    analyserRef.current = null;
+
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      void audioContextRef.current.close();
+    }
+    audioContextRef.current = null;
+
+    previousBarsRef.current = IDLE_BARS;
+    setBars(IDLE_BARS);
+  };
+
+  const startWaveform = async (stream: MediaStream) => {
+    const audioContext = new window.AudioContext();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.8;
+
+    const sourceNode = audioContext.createMediaStreamSource(stream);
+    sourceNode.connect(analyser);
+
+    audioContextRef.current = audioContext;
+    analyserRef.current = analyser;
+    sourceNodeRef.current = sourceNode;
+
+    const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+
+    const render = () => {
+      if (!analyserRef.current) {
+        return;
+      }
+
+      analyserRef.current.getByteFrequencyData(frequencyData);
+
+      const nextBars = new Array(BAR_COUNT).fill(0).map((_, index) => {
+        const start = Math.floor((index / BAR_COUNT) * frequencyData.length);
+        const end = Math.floor(((index + 1) / BAR_COUNT) * frequencyData.length);
+        const range = frequencyData.slice(start, Math.max(end, start + 1));
+        const avg = range.reduce((sum, value) => sum + value, 0) / range.length;
+        const scaled = 8 + (avg / 255) * 44;
+        const smoothed = previousBarsRef.current[index] * 0.62 + scaled * 0.38;
+        return Math.max(6, Math.min(52, smoothed));
+      });
+
+      previousBarsRef.current = nextBars;
+      setBars(nextBars);
+      animationFrameRef.current = window.requestAnimationFrame(render);
+    };
+
+    animationFrameRef.current = window.requestAnimationFrame(render);
+  };
 
   useEffect(() => {
     if (!recording) {
@@ -37,7 +110,6 @@ export function RecordClient() {
           setRecording(false);
           return 300;
         }
-
         return current + 1;
       });
     }, 1000);
@@ -45,26 +117,35 @@ export function RecordClient() {
     return () => window.clearInterval(timer);
   }, [recording]);
 
-  const bars = useMemo(
-    () => new Array(20).fill(0).map((_, index) => 18 + ((seconds + index * 7) % 42)),
-    [seconds],
-  );
+  useEffect(() => {
+    return () => {
+      stopWaveform();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      streamRef.current = stream;
+      await startWaveform(stream);
 
+      const mediaRecorder = new MediaRecorder(stream);
       chunksRef.current = [];
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
+
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setAudioBlob(blob);
         stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        stopWaveform();
       };
 
       mediaRecorder.start();
@@ -86,6 +167,14 @@ export function RecordClient() {
   };
 
   const discard = () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+    } else {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      stopWaveform();
+    }
+
     setRecording(false);
     setSeconds(0);
     setAudioBlob(null);
@@ -163,7 +252,7 @@ export function RecordClient() {
           <span
             key={index}
             className={`w-[3px] rounded-full ${index < 14 ? "bg-[var(--accent)]" : "bg-[var(--bg-muted)]"}`}
-            style={{ height: `${Math.max(6, Math.min(height, 50))}px` }}
+            style={{ height: `${Math.max(6, Math.min(height, 52))}px` }}
           />
         ))}
       </div>
