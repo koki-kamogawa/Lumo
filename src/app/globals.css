@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+  --page-bg-layer:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.28), transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-page) 92%, white 8%) 0%, var(--bg-page) 100%);
   --bg-page: #e0e0e0;
   --bg-card: #e0e0e0;
   --bg-elevated: #e8e8e8;
@@ -27,29 +31,29 @@
   --font-sans: var(--font-zen-maru);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-page: #1a1a1a;
-    --bg-card: #1a1a1a;
-    --bg-elevated: #222222;
-    --bg-inset: #141414;
-    --bg-muted: #111111;
-    --border-subtle: #252525;
-    --accent: #5cbf7a;
-    --accent-dark: #4aa868;
-    --accent-soft: #1e3325;
-    --accent-coral: #e09878;
-    --accent-coral-soft: #2e2018;
-    --accent-red: #e06060;
-    --accent-warning: #e0b85c;
-    --text-on-accent: #ffffff;
-    --text-primary: #e0e0e0;
-    --text-secondary: #999999;
-    --text-tertiary: #666666;
-    --icon-inactive: #555555;
-    --shadow-dark: #0d0d0d;
-    --shadow-light: #2a2a2a;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page-bg-layer: linear-gradient(180deg, #1c1c1c 0%, #1a1a1a 100%);
+  --bg-page: #1a1a1a;
+  --bg-card: #1a1a1a;
+  --bg-elevated: #222222;
+  --bg-inset: #141414;
+  --bg-muted: #111111;
+  --border-subtle: #252525;
+  --accent: #5cbf7a;
+  --accent-dark: #4aa868;
+  --accent-soft: #1e3325;
+  --accent-coral: #e09878;
+  --accent-coral-soft: #2e2018;
+  --accent-red: #e06060;
+  --accent-warning: #e0b85c;
+  --text-on-accent: #ffffff;
+  --text-primary: #e0e0e0;
+  --text-secondary: #999999;
+  --text-tertiary: #666666;
+  --icon-inactive: #555555;
+  --shadow-dark: #0a0a0a;
+  --shadow-light: #262626;
 }
 
 * {
@@ -63,9 +67,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.28), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--bg-page) 92%, white 8%) 0%, var(--bg-page) 100%);
+  background: var(--page-bg-layer);
   color: var(--text-primary);
   font-family: var(--font-zen-maru), sans-serif;
 }
@@ -126,4 +128,88 @@ button {
   text-shadow:
     -1px -1px 0 color-mix(in srgb, var(--shadow-light) 65%, transparent),
     1px 1px 0 color-mix(in srgb, var(--shadow-dark) 70%, transparent);
+}
+
+:root[data-theme="dark"] .pressable-soft-accent:active {
+  box-shadow:
+    inset 5px 5px 12px rgba(8, 8, 8, 0.72),
+    inset -5px -5px 12px rgba(78, 78, 78, 0.24);
+}
+
+:root[data-theme="dark"] .pressable-soft-neutral:active {
+  box-shadow:
+    inset 5px 5px 12px rgba(8, 8, 8, 0.72),
+    inset -5px -5px 12px rgba(74, 74, 74, 0.24);
+}
+
+@media (min-width: 1024px) {
+  :root[data-layout="desktop"] body {
+    padding: 20px;
+  }
+
+  :root[data-layout="desktop"] .app-shell {
+    width: min(1240px, calc(100vw - 40px));
+    max-width: none;
+    min-height: calc(100vh - 40px);
+    border-radius: 34px;
+    border: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
+    background: color-mix(in srgb, var(--bg-page) 92%, var(--bg-elevated) 8%);
+    box-shadow:
+      14px 14px 36px var(--shadow-dark),
+      -14px -14px 36px var(--shadow-light);
+    overflow: hidden;
+  }
+
+  :root[data-layout="desktop"] .app-shell-with-tab .app-shell-header {
+    padding: 26px 32px 8px 148px;
+  }
+
+  :root[data-layout="desktop"] .app-shell-with-tab .app-shell-main {
+    padding-top: 8px;
+    padding-right: 32px;
+    padding-bottom: 32px !important;
+    padding-left: 148px;
+  }
+
+  :root[data-layout="desktop"] .app-shell-no-tab .app-shell-header {
+    padding: 26px 32px 8px 32px;
+  }
+
+  :root[data-layout="desktop"] .app-shell-no-tab .app-shell-main {
+    padding-top: 8px;
+    padding-right: 32px;
+    padding-bottom: 32px !important;
+    padding-left: 32px;
+  }
+
+  :root[data-layout="desktop"] .app-tab-outer {
+    inset: auto 0 20px 0;
+    max-width: none;
+    width: min(1240px, calc(100vw - 40px));
+    justify-content: flex-start;
+    padding-right: 24px;
+    padding-left: 24px;
+    pointer-events: none;
+  }
+
+  :root[data-layout="desktop"] .app-tab-inner {
+    pointer-events: auto;
+    width: 104px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    border-radius: 24px;
+    padding: 10px;
+  }
+
+  :root[data-layout="desktop"] .app-tab-link {
+    width: 100%;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    border-radius: 14px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
 }

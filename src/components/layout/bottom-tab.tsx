@@ -25,8 +25,8 @@ export function BottomTab() {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex w-full max-w-[430px] justify-center px-4 pb-4">
-      <div className="flex w-full items-center justify-between rounded-[28px] bg-[var(--bg-page)] px-3 py-3 shadow-[10px_10px_22px_var(--shadow-dark),-10px_-10px_22px_var(--shadow-light)]">
+    <div className="app-tab-outer fixed inset-x-0 bottom-0 z-40 mx-auto flex w-full max-w-[430px] justify-center px-4 pb-4">
+      <div className="app-tab-inner flex w-full items-center justify-between rounded-[28px] bg-[var(--bg-page)] px-3 py-3 shadow-[10px_10px_22px_var(--shadow-dark),-10px_-10px_22px_var(--shadow-light)]">
         {tabs.map((tab) => {
           const active =
             tab.href === "/" ? pathname === "/" : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
@@ -37,7 +37,7 @@ export function BottomTab() {
               key={tab.href}
               href={tab.href}
               className={cn(
-                "pressable-soft flex min-w-14 flex-col items-center gap-1 rounded-[20px] px-3 py-2 text-[11px] font-medium",
+                "app-tab-link pressable-soft flex min-w-14 flex-col items-center gap-1 rounded-[20px] px-3 py-2 text-[11px] font-medium",
                 active
                   ? "pressable-soft-accent bg-[var(--accent)] text-[var(--text-on-accent)]"
                   : "pressable-soft-neutral text-[var(--icon-inactive)]",

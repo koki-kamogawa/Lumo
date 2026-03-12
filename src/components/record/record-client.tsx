@@ -11,6 +11,31 @@ import { fetchJson } from "@/lib/client";
 const BAR_COUNT = 20;
 const IDLE_BARS = new Array(BAR_COUNT).fill(10);
 
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  0?: {
+    transcript?: string;
+  };
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+};
+
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
 function formatClock(seconds: number) {
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
   const rest = String(seconds % 60).padStart(2, "0");
@@ -24,7 +49,10 @@ export function RecordClient() {
   const [memo, setMemo] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [recording, setRecording] = useState(false);
+  const [finalizingStop, setFinalizingStop] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [autoTranscript, setAutoTranscript] = useState("");
+  const [speechReady, setSpeechReady] = useState(false);
   const [bars, setBars] = useState<number[]>(IDLE_BARS);
   const [pending, startTransition] = useTransition();
 
@@ -37,6 +65,12 @@ export function RecordClient() {
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const previousBarsRef = useRef<number[]>(IDLE_BARS);
+
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const speechTranscriptRef = useRef("");
+  const speechInterimRef = useRef("");
+  const memoEditedRef = useRef(false);
+  const recordingRef = useRef(false);
 
   const stopWaveform = () => {
     if (animationFrameRef.current !== null) {
@@ -56,6 +90,94 @@ export function RecordClient() {
 
     previousBarsRef.current = IDLE_BARS;
     setBars(IDLE_BARS);
+  };
+
+  const stopSpeechRecognition = () => {
+    speechRecognitionRef.current?.stop();
+    speechRecognitionRef.current = null;
+  };
+
+  const startSpeechRecognition = () => {
+    if (!window.isSecureContext) {
+      setSpeechReady(false);
+      push({
+        title: "自動文字起こしを開始できません",
+        description: "このページは安全な接続として扱われていません。https か localhost で開いてください。",
+      });
+      return;
+    }
+
+    const speech = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const Ctor = speech.SpeechRecognition || speech.webkitSpeechRecognition;
+
+    if (!Ctor) {
+      setSpeechReady(false);
+      push({
+        title: "自動文字起こしは利用できません",
+        description: "このブラウザでは音声認識が未対応です。メモ入力で補完できます。",
+      });
+      return;
+    }
+
+    const recognition = new Ctor();
+    recognition.lang = "ja-JP";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const transcript = result?.[0]?.transcript?.trim();
+        if (!transcript) {
+          continue;
+        }
+
+        if (result.isFinal) {
+          speechTranscriptRef.current = `${speechTranscriptRef.current} ${transcript}`.trim();
+        } else {
+          interim = `${interim} ${transcript}`.trim();
+        }
+      }
+      speechInterimRef.current = interim;
+      const merged = `${speechTranscriptRef.current} ${interim}`.trim();
+      setAutoTranscript(merged);
+      if (!memoEditedRef.current) {
+        setMemo(merged);
+      }
+    };
+
+    recognition.onerror = () => {
+      setSpeechReady(false);
+      push({
+        title: "音声認識が不安定です",
+        description: "録音は継続できます。必要ならメモ欄に追記してください。",
+      });
+    };
+    recognition.onend = () => {
+      if (recordingRef.current) {
+        try {
+          recognition.start();
+          setSpeechReady(true);
+        } catch {}
+      }
+    };
+
+    try {
+      recognition.start();
+      speechRecognitionRef.current = recognition;
+      setSpeechReady(true);
+    } catch {
+      speechRecognitionRef.current = null;
+      setSpeechReady(false);
+      push({
+        title: "自動文字起こしを開始できませんでした",
+        description: "ブラウザ制限の可能性があります。メモ欄を併用してください。",
+      });
+    }
   };
 
   const startWaveform = async (stream: MediaStream) => {
@@ -99,6 +221,10 @@ export function RecordClient() {
   };
 
   useEffect(() => {
+    recordingRef.current = recording;
+  }, [recording]);
+
+  useEffect(() => {
     if (!recording) {
       return;
     }
@@ -120,6 +246,7 @@ export function RecordClient() {
   useEffect(() => {
     return () => {
       stopWaveform();
+      stopSpeechRecognition();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
@@ -146,6 +273,7 @@ export function RecordClient() {
         stream.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
         stopWaveform();
+        setFinalizingStop(false);
       };
 
       mediaRecorder.start();
@@ -153,6 +281,12 @@ export function RecordClient() {
       setAudioBlob(null);
       setSeconds(0);
       setRecording(true);
+      setFinalizingStop(false);
+      setAutoTranscript("");
+      speechTranscriptRef.current = "";
+      speechInterimRef.current = "";
+      memoEditedRef.current = false;
+      startSpeechRecognition();
     } catch {
       push({
         title: "録音を開始できませんでした",
@@ -162,11 +296,26 @@ export function RecordClient() {
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      return;
+    }
+
+    recordingRef.current = false;
+    setFinalizingStop(true);
+    stopSpeechRecognition();
+    const merged = `${speechTranscriptRef.current} ${speechInterimRef.current}`.trim();
+    setAutoTranscript((current) => current.trim() || merged);
+    if (!memoEditedRef.current) {
+      setMemo((current) => current.trim() || merged);
+    }
+    recorder.stop();
     setRecording(false);
   };
 
   const discard = () => {
+    stopSpeechRecognition();
+    setFinalizingStop(false);
     if (recording) {
       mediaRecorderRef.current?.stop();
     } else {
@@ -178,12 +327,36 @@ export function RecordClient() {
     setRecording(false);
     setSeconds(0);
     setAudioBlob(null);
+    setAutoTranscript("");
+    speechTranscriptRef.current = "";
+    speechInterimRef.current = "";
+    setSpeechReady(false);
+    memoEditedRef.current = false;
     chunksRef.current = [];
   };
 
   const submit = () => {
+    const hasInput = Boolean(audioBlob || autoTranscript.trim() || memo.trim());
+    if (!hasInput) {
+      push({
+        title: "入力がありません",
+        description: "録音するか、メモを入力してから保存してください。",
+      });
+      return;
+    }
+
+    if (finalizingStop) {
+      push({
+        title: "録音を確定中です",
+        description: "数秒待ってからもう一度実行してください。",
+      });
+      return;
+    }
+
     startTransition(async () => {
       try {
+        const transcriptOverride = autoTranscript.trim() || memo.trim() || undefined;
+
         const entry = await fetchJson<{ id: string }>("/api/entries", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -198,7 +371,7 @@ export function RecordClient() {
           const formData = new FormData();
           formData.append("file", file);
           formData.append("durationSec", String(seconds));
-          await fetch(`/api/entries/${entry.id}/audio`, {
+          await fetchJson(`/api/entries/${entry.id}/audio`, {
             method: "POST",
             body: formData,
           });
@@ -207,7 +380,7 @@ export function RecordClient() {
         await fetchJson(`/api/entries/${entry.id}/transcribe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ overrideText: memo || undefined }),
+          body: JSON.stringify({ overrideText: transcriptOverride }),
         });
 
         await fetchJson(`/api/entries/${entry.id}/analyze`, {
@@ -221,7 +394,7 @@ export function RecordClient() {
         router.refresh();
       } catch (error) {
         push({
-          title: "送信に失敗しました",
+          title: "保存に失敗しました",
           description: error instanceof Error ? error.message : "Unknown error",
         });
       }
@@ -279,13 +452,33 @@ export function RecordClient() {
       <input
         id="record-memo-input"
         value={memo}
-        onChange={(event) => setMemo(event.target.value)}
+        onChange={(event) => {
+          memoEditedRef.current = true;
+          setMemo(event.target.value);
+        }}
         placeholder="話したいことを一言だけ"
-        aria-label="補足メモ"
+        aria-label="メモ"
         className="h-12 w-full rounded-[14px] bg-[var(--bg-page)] px-4 text-sm text-[var(--text-primary)] outline-none shadow-[inset_4px_4px_10px_var(--shadow-dark),inset_-4px_-4px_10px_var(--shadow-light)]"
       />
 
-      <Button className="w-full" onClick={submit} disabled={pending || recording}>
+      {recording ? (
+        <p className="text-xs text-[var(--text-tertiary)]">
+          {speechReady ? "話した内容を認識中..." : "録音中（自動文字起こしは未接続）"}
+        </p>
+      ) : null}
+
+      {autoTranscript ? (
+        <Card inset className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-xs font-semibold text-[var(--text-tertiary)]">自動文字起こし（録音中）</p>
+          <p className="mt-2 whitespace-pre-wrap break-words">{autoTranscript}</p>
+        </Card>
+      ) : null}
+
+      <Button
+        className="w-full"
+        onClick={submit}
+        disabled={pending || recording || finalizingStop || (!audioBlob && !autoTranscript.trim() && !memo.trim())}
+      >
         話し終わった
       </Button>
     </div>

@@ -16,13 +16,19 @@ export async function PATCH(request: Request) {
 
   try {
     const body = patchSettingsSchema.parse(await request.json());
+    const safeBody = { ...body };
+    delete safeBody.shareByDefault;
     const settings = await prisma.settings.update({
       where: { userId: user.id },
-      data: body,
+      data: {
+        ...safeBody,
+        shareByDefault: false,
+      },
     });
 
     return jsonOk(settingsSchema, {
       ...settings,
+      shareByDefault: false,
       reminderFrequency: settings.reminderFrequency,
       reminderTime: settings.reminderTime,
       createdAt: settings.createdAt.toISOString(),

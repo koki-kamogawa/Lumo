@@ -11,6 +11,13 @@ import {
   serializeWeeklyReport,
 } from "@/lib/data/serializers";
 
+function normalizeMemoryText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[「」『』（）()［］【】、。,.!！?？:：;；・…ー\-]/g, "");
+}
+
 export async function getSettingsForUser(userId: string) {
   const settings = await prisma.settings.findUniqueOrThrow({
     where: { userId },
@@ -115,7 +122,35 @@ export async function getMemoryItems(userId: string, status?: string) {
     },
   });
 
-  return items.map(serializeMemoryItem);
+  const uniqueMap = new Map<string, (typeof items)[number]>();
+  const evidenceSeenMap = new Map<string, Set<string>>();
+
+  for (const item of items) {
+    const key = normalizeMemoryText(item.memoryText) || item.id;
+    const existing = uniqueMap.get(key);
+
+    if (!existing) {
+      uniqueMap.set(key, item);
+      evidenceSeenMap.set(
+        key,
+        new Set(item.evidenceLinks.map((link) => `${link.entryId ?? "none"}:${link.quote}`)),
+      );
+      continue;
+    }
+
+    const existingEvidenceKeys = evidenceSeenMap.get(key) ?? new Set<string>();
+    for (const link of item.evidenceLinks) {
+      const evidenceKey = `${link.entryId ?? "none"}:${link.quote}`;
+      if (existingEvidenceKeys.has(evidenceKey)) {
+        continue;
+      }
+      existing.evidenceLinks.push(link);
+      existingEvidenceKeys.add(evidenceKey);
+    }
+    evidenceSeenMap.set(key, existingEvidenceKeys);
+  }
+
+  return Array.from(uniqueMap.values()).map(serializeMemoryItem);
 }
 
 export async function getMemoryProposal(userId: string, proposalId: string) {

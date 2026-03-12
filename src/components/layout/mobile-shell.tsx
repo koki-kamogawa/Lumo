@@ -13,8 +13,12 @@ export function MobileShell({
   withTabBar?: boolean;
 }) {
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-[var(--bg-page)]">
-      <div className="flex items-center justify-between px-6 pb-2 pt-5">
+    <div
+      className={`app-shell mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-[var(--bg-page)] ${
+        withTabBar ? "app-shell-with-tab" : "app-shell-no-tab"
+      }`}
+    >
+      <div className="app-shell-header flex items-center justify-between px-6 pb-2 pt-5">
         {topLeft ?? <div />}
         {topAction !== undefined ? topAction : (
           <Link
@@ -25,7 +29,7 @@ export function MobileShell({
           </Link>
         )}
       </div>
-      <main className={`flex-1 px-6 pt-2 ${withTabBar ? "pb-28" : "pb-8"}`}>{children}</main>
+      <main className={`app-shell-main flex-1 px-6 pt-2 ${withTabBar ? "pb-28" : "pb-8"}`}>{children}</main>
     </div>
   );
 }

@@ -5,6 +5,13 @@ import { prisma } from "@/lib/db";
 import { memoryItemSchema, patchMemoryItemSchema } from "@/lib/schemas/domain";
 import { jsonError, jsonOk } from "@/lib/schemas/http";
 
+function normalizeMemoryText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[「」『』（）()［］【】、。,.!！?？:：;；・…ー\-]/g, "");
+}
+
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   const { id } = await context.params;
@@ -93,8 +100,21 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     return jsonError("Memory item not found", 404);
   }
 
-  await prisma.memoryItem.delete({
-    where: { id },
+  const allItems = await prisma.memoryItem.findMany({
+    where: { userId: user.id },
+    select: { id: true, memoryText: true },
+  });
+  const targetKey = normalizeMemoryText(item.memoryText);
+  const idsToDelete = allItems
+    .filter((value) => normalizeMemoryText(value.memoryText) === targetKey)
+    .map((value) => value.id);
+
+  await prisma.memoryItem.deleteMany({
+    where: {
+      id: {
+        in: idsToDelete.length > 0 ? idsToDelete : [id],
+      },
+    },
   });
 
   return new Response(null, { status: 204 });

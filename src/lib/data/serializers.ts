@@ -34,6 +34,7 @@ function parseJsonArray<T>(value: unknown): T[] {
 export function serializeSettings(settings: Settings) {
   return {
     ...settings,
+    shareByDefault: false,
     reminderFrequency: settings.reminderFrequency ?? null,
     reminderTime: settings.reminderTime ?? null,
     createdAt: settings.createdAt.toISOString(),

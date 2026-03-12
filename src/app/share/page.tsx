@@ -1,3 +1,5 @@
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { MobileShell } from "@/components/layout/mobile-shell";
 import { ShareCardClient } from "@/components/share/share-card-client";
 import { Card } from "@/components/ui/card";
@@ -31,6 +33,7 @@ export default async function SharePage({
 }) {
   const { entryId, weeklyId } = await searchParams;
   const user = await getCurrentUser();
+  const backHref = entryId ? `/entries/${entryId}` : weeklyId ? `/weekly/${weeklyId}` : "/";
 
   let headline = "洞察共有カード";
   let quote = "まだ共有できる洞察がありません。";
@@ -61,7 +64,18 @@ export default async function SharePage({
   const shareText = `${headline}\n${quote}\n${emotions.join(" / ")}\nLumo`;
 
   return (
-    <MobileShell>
+    <MobileShell
+      withTabBar={false}
+      topLeft={
+        <Link
+          href={backHref}
+          aria-label="前の画面へ戻る"
+          className="pressable-soft pressable-soft-neutral rounded-full bg-[var(--bg-page)] p-3 text-[var(--text-secondary)] shadow-[6px_6px_14px_var(--shadow-dark),-6px_-6px_14px_var(--shadow-light)]"
+        >
+          <ArrowLeft className="size-5" />
+        </Link>
+      }
+    >
       <div className="space-y-5">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-[var(--text-primary)]">共有カード</h1>

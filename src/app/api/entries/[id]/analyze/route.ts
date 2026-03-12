@@ -7,6 +7,18 @@ import { entryDetailSchema, toneOverrideSchema } from "@/lib/schemas/domain";
 import { jsonError, jsonOk } from "@/lib/schemas/http";
 import { analyzer } from "@/lib/services/analyze";
 
+function normalizeMemoryText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[「」『』（）()［］【】、。,.!！?？:：;；・…ー\-]/g, "");
+}
+
+function mergeSensitivity(current: string, next: string) {
+  const rank = { LOW: 1, MEDIUM: 2, HIGH: 3 } as const;
+  return rank[next as keyof typeof rank] > rank[current as keyof typeof rank] ? next : current;
+}
+
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   const { id } = await context.params;
@@ -91,58 +103,127 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         },
       });
 
-      if (settings.memoryMode === "AUTO") {
-        await Promise.all(
-          result.memory_proposals.map((proposal) =>
-            tx.memoryItem.create({
-              data: {
-              userId: user.id,
-              memoryText: proposal.memory_text,
-                confidence: proposal.confidence,
-                stability: proposal.stability,
-                sensitivity: proposal.sensitivity,
-                status: "ACTIVE",
-                sourceMode: "AUTO",
-                evidenceLinks: {
-                  create: {
-                    entryId: id,
-                    quote: proposal.evidence_quote,
-                  },
-                },
-              },
-            }),
-          ),
-        );
-
-        await tx.memoryProposal.updateMany({
-          where: { userId: user.id, entryId: id, status: ProposalStatus.PENDING },
-          data: { status: ProposalStatus.APPLIED },
-        });
-      } else {
-        const existing = await tx.memoryProposal.findFirst({
-          where: { entryId: id, userId: user.id },
-          orderBy: { createdAt: "desc" },
-        });
-
-        if (existing) {
-          await tx.memoryProposal.update({
-            where: { id: existing.id },
-            data: {
-              proposedItemsJson: JSON.stringify(result.memory_proposals),
-              status: ProposalStatus.PENDING,
-            },
-          });
-        } else {
-          await tx.memoryProposal.create({
-            data: {
-              userId: user.id,
+      const autoMemoryForEntry = await tx.memoryItem.findMany({
+        where: {
+          userId: user.id,
+          sourceMode: "AUTO",
+          evidenceLinks: {
+            some: {
               entryId: id,
-              proposedItemsJson: JSON.stringify(result.memory_proposals),
-              status: ProposalStatus.PENDING,
             },
-          });
+          },
+        },
+        select: { id: true },
+      });
+
+      if (autoMemoryForEntry.length > 0) {
+        await tx.memoryItem.deleteMany({
+          where: {
+            id: {
+              in: autoMemoryForEntry.map((item) => item.id),
+            },
+          },
+        });
+      }
+
+      const uniqueProposals = result.memory_proposals.filter((proposal, index, list) => {
+        const key = normalizeMemoryText(proposal.memory_text);
+        return list.findIndex((item) => normalizeMemoryText(item.memory_text) === key) === index;
+      });
+
+      const existingMemory = await tx.memoryItem.findMany({
+        where: { userId: user.id },
+        select: {
+          id: true,
+          memoryText: true,
+          confidence: true,
+          stability: true,
+          sensitivity: true,
+          status: true,
+        },
+      });
+
+      const existingByKey = new Map<string, (typeof existingMemory)[number]>();
+      for (const item of existingMemory) {
+        const key = normalizeMemoryText(item.memoryText);
+        if (!key) {
+          continue;
+        }
+
+        const current = existingByKey.get(key);
+        if (!current || (current.status !== "ACTIVE" && item.status === "ACTIVE")) {
+          existingByKey.set(key, item);
         }
       }
+
+      for (const proposal of uniqueProposals) {
+        const key = normalizeMemoryText(proposal.memory_text);
+        const matched = existingByKey.get(key);
+
+        if (matched) {
+          await tx.memoryItem.update({
+            where: { id: matched.id },
+            data: {
+              confidence: Math.max(matched.confidence, proposal.confidence),
+              stability: Math.max(matched.stability, proposal.stability),
+              sensitivity: mergeSensitivity(matched.sensitivity, proposal.sensitivity),
+              status: "ACTIVE",
+              archivedAt: null,
+            },
+          });
+
+          const hasEvidence = await tx.memoryEvidenceLink.findFirst({
+            where: {
+              memoryItemId: matched.id,
+              entryId: id,
+              quote: proposal.evidence_quote,
+            },
+            select: { id: true },
+          });
+
+          if (!hasEvidence) {
+            await tx.memoryEvidenceLink.create({
+              data: {
+                memoryItemId: matched.id,
+                entryId: id,
+                quote: proposal.evidence_quote,
+              },
+            });
+          }
+          continue;
+        }
+
+        const created = await tx.memoryItem.create({
+          data: {
+            userId: user.id,
+            memoryText: proposal.memory_text,
+            confidence: proposal.confidence,
+            stability: proposal.stability,
+            sensitivity: proposal.sensitivity,
+            status: "ACTIVE",
+            sourceMode: "AUTO",
+            evidenceLinks: {
+              create: {
+                entryId: id,
+                quote: proposal.evidence_quote,
+              },
+            },
+          },
+        });
+        existingByKey.set(key, {
+          id: created.id,
+          memoryText: created.memoryText,
+          confidence: created.confidence,
+          stability: created.stability,
+          sensitivity: created.sensitivity,
+          status: created.status,
+        });
+      }
+
+      await tx.memoryProposal.updateMany({
+        where: { userId: user.id, entryId: id, status: ProposalStatus.PENDING },
+        data: { status: ProposalStatus.APPLIED },
+      });
     });
 
     const detail = await getEntryDetail(user.id, id);
@@ -152,6 +233,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return jsonError("Invalid analyze payload", 422, error.flatten());
     }
 
-    return jsonError("Failed to analyze entry", 500);
+    const message = error instanceof Error ? error.message : "Failed to analyze entry";
+    return jsonError(message, 500);
   }
 }

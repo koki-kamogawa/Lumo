@@ -28,6 +28,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       },
       include: {
         transcript: true,
+        audio: true,
       },
     });
 
@@ -39,7 +40,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       entryId: id,
       note: entry.note,
       existingTranscript: body.overrideText || entry.transcript?.editedContent || entry.transcript?.content,
+      audioFilePath: entry.audio?.filePath,
+      audioMimeType: entry.audio?.mimeType,
     });
+
+    if (result.source === "local-fallback") {
+      return jsonError(
+        "Automatic transcription is not configured. Set WHISPER_CPP_COMMAND and WHISPER_CPP_MODEL_PATH, or provide text input.",
+        422,
+      );
+    }
 
     const transcript = await prisma.transcript.upsert({
       where: { entryId: id },
@@ -72,4 +82,3 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return jsonError("Failed to transcribe entry", 500);
   }
 }
-
