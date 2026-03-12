@@ -1,5 +1,6 @@
 import { MemoryMode, ProposalStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { buildWeeklyLiveMetrics, calculateCurrentStreak } from "@/lib/data/live-metrics";
 import { endOfWeek, startOfWeek } from "@/lib/utils";
 import {
   serializeAnalysis,
@@ -164,7 +165,90 @@ export async function getMemoryProposal(userId: string, proposalId: string) {
   return serializeProposal(proposal);
 }
 
+export async function upsertWeeklyReportForWeek(userId: string, anchor = new Date()) {
+  const weekStart = startOfWeek(anchor);
+  const weekEnd = endOfWeek(anchor);
+
+  const entries = await prisma.entry.findMany({
+    where: {
+      userId,
+      deletedAt: null,
+      occurredAt: {
+        gte: weekStart,
+        lte: weekEnd,
+      },
+    },
+    include: {
+      analysis: {
+        select: {
+          emotionTopJson: true,
+          summaryFacts: true,
+        },
+      },
+      transcript: {
+        select: {
+          content: true,
+          editedContent: true,
+        },
+      },
+    },
+    orderBy: {
+      occurredAt: "asc",
+    },
+  });
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const metrics = buildWeeklyLiveMetrics(entries, weekStart);
+  const existing = await prisma.weeklyReport.findFirst({
+    where: {
+      userId,
+      weekStart: {
+        gte: weekStart,
+        lte: weekEnd,
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  const saved = existing
+    ? await prisma.weeklyReport.update({
+        where: { id: existing.id },
+        data: {
+          weekStart,
+          weekEnd,
+          emotionFlowJson: JSON.stringify(metrics.emotionFlowJson),
+          themeTagsJson: JSON.stringify(metrics.themeTagsJson),
+          changeSummary: metrics.changeSummary,
+          loopSummary: metrics.loopSummary,
+          recoveryListJson: JSON.stringify(metrics.recoveryListJson),
+          shareLine: metrics.shareLine,
+        },
+      })
+    : await prisma.weeklyReport.create({
+        data: {
+          userId,
+          weekStart,
+          weekEnd,
+          emotionFlowJson: JSON.stringify(metrics.emotionFlowJson),
+          themeTagsJson: JSON.stringify(metrics.themeTagsJson),
+          changeSummary: metrics.changeSummary,
+          loopSummary: metrics.loopSummary,
+          recoveryListJson: JSON.stringify(metrics.recoveryListJson),
+          shareLine: metrics.shareLine,
+        },
+      });
+
+  return serializeWeeklyReport(saved);
+}
+
 export async function getWeeklyReports(userId: string) {
+  await upsertWeeklyReportForWeek(userId);
+
   const reports = await prisma.weeklyReport.findMany({
     where: { userId },
     orderBy: { weekStart: "desc" },
@@ -185,7 +269,7 @@ export async function getWeeklyReport(userId: string, reportId: string) {
 }
 
 export async function getHomeData(userId: string) {
-  const [entries, settings, activeProposalCount] = await Promise.all([
+  const [entries, settings, activeProposalCount, streakEntries] = await Promise.all([
     prisma.entry.findMany({
       where: {
         userId,
@@ -202,6 +286,19 @@ export async function getHomeData(userId: string) {
     prisma.settings.findUniqueOrThrow({ where: { userId } }),
     prisma.memoryProposal.count({
       where: { userId, status: ProposalStatus.PENDING },
+    }),
+    prisma.entry.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+      },
+      select: {
+        occurredAt: true,
+      },
+      orderBy: {
+        occurredAt: "desc",
+      },
+      take: 180,
     }),
   ]);
 
@@ -234,11 +331,16 @@ export async function getHomeData(userId: string) {
     yesterdayCard,
     weeklyCount,
     activeProposalCount,
-    streak: Math.min(entries.length, 7),
+    streak: calculateCurrentStreak(streakEntries.map((entry) => entry.occurredAt)),
   };
 }
 
 export async function getDashboardWeeklyReport(userId: string) {
+  const currentWeek = await upsertWeeklyReportForWeek(userId);
+  if (currentWeek) {
+    return currentWeek;
+  }
+
   const report = await prisma.weeklyReport.findFirst({
     where: { userId },
     orderBy: { weekStart: "desc" },
